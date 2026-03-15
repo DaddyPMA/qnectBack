@@ -1,0 +1,125 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  password      String
+  bio           String?
+  avatar        String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  files         File[]
+  folders       Folder[]
+  sessions      Session[]
+  friends       Friendship[] @relation("userFriends")
+  friendedBy    Friendship[] @relation("friendUser")
+  loginAttempts LoginAttempt[]
+  sharedFiles   FileShare[]
+
+  @@index([email])
+}
+
+model Session {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([token])
+}
+
+model Friendship {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation("userFriends", fields: [userId], references: [id], onDelete: Cascade)
+  friendId  String
+  friend    User      @relation("friendUser", fields: [friendId], references: [id], onDelete: Cascade)
+  status    String    @default("pending") // pending, accepted, blocked
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, friendId])
+  @@index([userId])
+  @@index([friendId])
+}
+
+model Folder {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  parentId  String?
+  parent    Folder?   @relation("folderChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Folder[]  @relation("folderChildren")
+  files     File[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([userId, name, parentId])
+  @@index([userId])
+  @@index([parentId])
+}
+
+model File {
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  folderId     String?
+  folder       Folder?   @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  filename     String
+  originalName String
+  mimeType     String
+  size         BigInt
+  path         String
+  permission   String    @default("private") // private, friends, public
+  uploadedAt   DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  shares       FileShare[]
+
+  @@index([userId])
+  @@index([folderId])
+  @@index([permission])
+}
+
+model FileShare {
+  id        String    @id @default(cuid())
+  fileId    String
+  file      File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  access    String    @default("view") // view, download, edit
+  sharedAt  DateTime  @default(now())
+
+  @@unique([fileId, userId])
+  @@index([fileId])
+  @@index([userId])
+}
+
+model LoginAttempt {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ipAddress String
+  success   Boolean
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
