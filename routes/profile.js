@@ -119,5 +119,97 @@ router.get('/me/stats', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch stats' });
   }
 });
+// Search users
+router.get('/search/:query', async (req, res) => {
+  try {
+    const { query } = req.params;
+
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { name: { contains: query, mode: 'insensitive' } },
+          { email: { contains: query, mode: 'insensitive' } }
+        ]
+      },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        avatar: true,
+        createdAt: true,
+      },
+      take: 20
+    });
+
+    res.json(users);
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ error: 'Failed to search users' });
+  }
+});
+
+// Get user profile with friend status
+router.get('/:userId/with-status', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const currentUserId = req.user?.userId;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        bio: true,
+        avatar: true,
+        createdAt: true,
+        _count: {
+          select: {
+            files: true,
+            folders: true,
+            friendships: true,
+          }
+        }
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if already friends or pending request
+    let friendStatus = 'none';
+    if (currentUserId && currentUserId !== userId) {
+      const friendship = await prisma.friendship.findFirst({
+        where: {
+          OR: [
+            { userId: currentUserId, friendId: userId },
+            { userId: userId, friendId: currentUserId }
+          ]
+        }
+      });
+
+      if (friendship) {
+        friendStatus = friendship.status;
+      }
+    }
+
+    res.json({
+      user: {
+        ...user,
+        stats: {
+          files: user._count.files,
+          folders: user._count.folders,
+          friends: user._count.friendships,
+        }
+      },
+      friendStatus
+    });
+  } catch (error) {
+    console.error('Error fetching profile with status:', error);
+    res.status(500).json({ error: 'Failed to fetch profile' });
+  }
+});
 
 module.exports = router;
+
+
