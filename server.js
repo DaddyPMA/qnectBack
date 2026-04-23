@@ -172,7 +172,7 @@ app.use((err, req, res, next) => {
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
-  console.log(`🚀 Qnect server running on port ${PORT}`);
+  console.log(`Qnect server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV}`);
   console.log(`CORS origin: ${allowedOrigin}`);
 });
